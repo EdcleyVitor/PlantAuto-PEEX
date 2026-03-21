@@ -18,14 +18,16 @@ O funcionamento do aplicativo é dividido em etapas:
 
 ### 🔎 1. Pesquisa de Plantas (Wikipedia API)
 
-O usuário realiza uma busca por plantas utilizando a API da Wikipedia, permitindo acesso a:
+O usuário realiza uma busca por plantas utilizando a API da Wikipedia **apenas para fins de interface e identificação visual**, permitindo acesso a:
 
 * Nome da planta
 * Informações gerais
 * Imagens
 * Descrição
 
-Essa etapa facilita a identificação correta da planta.
+⚠️ Importante: **a Wikipedia NÃO é usada para decisões de irrigação ou cálculos do sistema**.
+
+Essa etapa serve exclusivamente para ajudar o usuário a identificar corretamente a planta.
 
 ---
 
@@ -93,9 +95,11 @@ O sistema pode evoluir para aprendizado automático com base em histórico:
 
 Usuário
 ↓
-App (Wikipedia + Perenual API)
+App (Wikipedia → busca visual)
 ↓
-Sistema de Conversão
+Perenual API (dados técnicos de irrigação)
+↓
+Sistema de Conversão (lógica própria)
 ↓
 ESP32 (Sensor + Controle)
 ↓
@@ -123,11 +127,55 @@ Irrigação Automática
 
 ## 💡 Estratégia Inteligente
 
-Para maior eficiência, o sistema utiliza:
+O sistema segue uma separação clara de responsabilidades:
+
+* Wikipedia → interface (nome, imagem, descrição)
+* Perenual API → dados técnicos (irrigação)
+* Sistema próprio → conversão e cálculos
+* ESP32 → execução física
+
+Além disso, utiliza:
 
 * Cache local de dados
 * Conversão de dados qualitativos para quantitativos
-* Uso combinado de sensores e APIs
+* Uso combinado de sensores e lógica computacional
+
+---
+
+## 🗄️ Sistema de Banco de Dados e Histórico
+
+O sistema contará com um banco de dados em SQL para armazenamento de informações, evitando requisições desnecessárias às APIs e permitindo aprendizado contínuo.
+
+### 📊 O que será armazenado:
+
+* Tipos de plantas cadastradas
+* Parâmetros de irrigação (umidade ideal, fator, tempo)
+* Dados coletados dos sensores
+* Histórico de irrigações realizadas
+* Resultados obtidos (antes/depois da irrigação)
+
+### 🎯 Objetivo do banco de dados:
+
+* Reduzir uso de APIs externas
+* Aumentar velocidade do sistema
+* Permitir ajustes automáticos (Machine Learning futuro)
+* Criar histórico inteligente de cultivo
+
+---
+
+## 🌱 Estrutura Física dos Canteiros
+
+Os canteiros da horta possuem as seguintes dimensões:
+
+* Comprimento: 18 tijolos
+* Largura: 4 tijolos
+* Espaçamento: 2 divisões com aproximadamente 1,5 cm de cimento entre eles
+
+Essas medidas serão consideradas para:
+
+* Distribuição de sensores
+* Controle por zonas de irrigação
+* Cálculo da quantidade de água necessária
 
 ---
 
@@ -157,5 +205,7 @@ EETEPA
 ---
 
 ## 📊 Status do Projeto
+
+🛠️ Em desenvolvimento
 
 🛠️ Em desenvolvimento
