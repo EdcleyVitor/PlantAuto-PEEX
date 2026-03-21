@@ -1,95 +1,224 @@
 # 🌱 PlantAuto PEEX
 
-Sistema de irrigação automática inteligente desenvolvido com ESP32 para automação e monitoramento da horta escolar.
+Sistema inteligente de irrigação automática desenvolvido com ESP32, integração com APIs públicas e arquitetura preparada para Machine Learning.
 
 ---
 
-## 📌 Sobre o Projeto
+## 📌 Visão Geral
 
-O **PlantAuto PEEX** é um projeto desenvolvido no âmbito do programa PEEX, com o objetivo de automatizar a irrigação da horta da escola EETEPA, localizada em Santarém - PA.
+O **PlantAuto PEEX** é um projeto de automação agrícola escolar que combina:
 
-O sistema utiliza sensores para monitorar a umidade do solo e realiza a irrigação de forma automática, garantindo o uso eficiente da água e melhores condições para o crescimento das plantas.
+* Sensores físicos (umidade do solo)
+* Microcontrolador ESP32
+* APIs públicas de plantas
+* Lógica de cálculo inteligente
+* Estrutura para aprendizado futuro (Machine Learning)
 
----
-
-## 🎯 Objetivos
-
-- Automatizar o processo de irrigação  
-- Reduzir o desperdício de água  
-- Melhorar o desenvolvimento das plantas  
-- Permitir monitoramento remoto da horta  
-- Integrar tecnologia com agricultura sustentável  
+O objetivo é criar um sistema capaz de irrigar plantas de forma eficiente, adaptando-se às necessidades específicas de cada cultivo.
 
 ---
 
-## ⚙️ Tecnologias Utilizadas
+## 🧠 Arquitetura do Projeto
 
-### 🔌 Hardware
-- ESP32  
-- Sensor de umidade do solo  
-- Módulo relé  
-- Bomba de água  
-- Sistema de irrigação (tubos/mangueiras)  
+O sistema é dividido em módulos:
 
-### 💻 Software
-- Programação em C/C++ (Arduino IDE)  
-- Comunicação via Wi-Fi  
-- Desenvolvimento de sistema web para monitoramento  
+### 📱 Frontend (Interface)
 
----
+Responsável por:
 
-## 🔄 Funcionamento
+* Busca de plantas
+* Exibição de dados
+* Controle do sistema
 
-1. O sensor mede a umidade do solo  
-2. O ESP32 processa os dados  
-3. Se o solo estiver seco, a irrigação é ativada  
-4. Quando atingir o nível ideal, a irrigação é desligada  
-5. Os dados podem ser visualizados em um sistema web  
+👉 O HTML atual é um **protótipo funcional** usado para testar APIs e lógica.
 
 ---
 
-## 🌿 Diferenciais
+### 🌐 APIs Externas
 
-- Uso do ESP32 (Wi-Fi integrado)  
-- Monitoramento em tempo real  
-- Sistema adaptável para diferentes tipos de plantas  
-- Possibilidade de expansão (mais sensores e automações)  
+#### Wikipedia
+
+* Usada apenas para:
+
+  * Nome
+  * Imagem
+  * Descrição
+
+❗ NÃO usada para decisões técnicas
+
+#### Perenual API
+
+* Fornece:
+
+  * Nível de irrigação (watering)
 
 ---
 
-## 📊 Futuras Melhorias
+### ⚙️ Sistema de Lógica
 
-- Dashboard com gráficos de umidade  
-- Controle remoto via celular  
-- Sistema de irrigação por zonas  
-- Integração com energia solar  
-- Alertas automáticos  
+Responsável por:
+
+* Converter dados da API
+* Calcular irrigação
+* Tomar decisões
+
+#### Conversão de dados:
+
+* minimum → 0.5
+* average → 1.0
+* frequent → 1.5
+
+---
+
+### 🔌 ESP32 (Hardware)
+
+Responsável por:
+
+* Ler sensores de umidade
+* Executar irrigação
+* Receber dados do sistema
+
+---
+
+## 🧮 Cálculo de Irrigação
+
+O sistema utiliza a fórmula:
+
+```
+tempo = (umidadeIdeal - umidadeAtual) × fatorPlanta × constante
+```
+
+Onde:
+
+* umidadeAtual → sensor
+* fatorPlanta → API
+* constante → ajuste empírico
+
+---
+
+## 🗄️ Banco de Dados (Planejado)
+
+Será utilizado SQL para armazenar:
+
+* Plantas
+* Parâmetros
+* Leituras de sensores
+* Histórico de irrigação
+
+### 🎯 Objetivo:
+
+* Reduzir chamadas de API
+* Aumentar performance
+* Permitir Machine Learning
+
+---
+
+## 🔁 Sistema de Histórico
+
+O sistema irá registrar:
+
+* Umidade antes/depois
+* Tempo de irrigação
+* Resultado obtido
+
+👉 Base para aprendizado futuro
+
+---
+
+## 🤖 Machine Learning (Futuro)
+
+O sistema poderá:
+
+* Ajustar automaticamente parâmetros
+* Aprender comportamento do solo
+* Otimizar irrigação
+
+---
+
+## 🌱 Estrutura Física
+
+Canteiros:
+
+* 18 tijolos de comprimento
+* 4 tijolos de largura
+* Divisões com 1,5 cm de cimento
+
+Aplicação:
+
+* Zonas de irrigação
+* Distribuição de sensores
+
+---
+
+## ⚠️ Estado Atual do Projeto
+
+### ✅ Concluído
+
+* Estrutura conceitual
+* Integração com API (teste)
+* Cálculo de irrigação
+* Protótipo frontend
+
+### 🚧 Em desenvolvimento
+
+* Backend
+* Integração com ESP32
+* Banco de dados
+
+### ❌ Ainda não implementado
+
+* Sensor real conectado
+* Sistema online completo
+* Machine Learning
+
+---
+
+## 📁 Estrutura do Projeto (Planejada)
+
+```
+/frontend
+/backend
+/esp32
+/database
+/docs
+```
+
+---
+
+## ⚠️ Observações Importantes
+
+* O HTML atual é apenas um teste de API
+* A chave da API deve ser movida para backend
+* O sistema final não dependerá totalmente de APIs
 
 ---
 
 ## 👨‍💻 Desenvolvedor
 
-**Edcley Vítor**  
-Programador e responsável pela parte eletrônica  
-Projeto PEEX 
-**Heslander Matheus**
-editor de vídeo e usuário de canva 
+**Edcley Vítor**
+Projeto PEEX
+Programador e responsável pela arquitetura do sistema
 
 ---
 
 ## 📍 Local
 
-Santarém - Pará  
-Escola EETEPA  
+Santarém - Pará
+EETEPA
 
 ---
 
-## 🌎 Impacto
+## 🚀 Visão do Projeto
 
-O projeto contribui para a sustentabilidade, promovendo o uso consciente da água e incentivando a aplicação da tecnologia na agricultura.
+Criar um sistema inteligente capaz de unir:
+
+* Automação
+* IoT
+* Inteligência Artificial
+* Sustentabilidade
 
 ---
 
-## 🚀 Status do Projeto
+## 📊 Status
 
-🛠️ Em desenvolvimento
+🛠️ Em desenvolvimento (fase de protótipo avançado)
