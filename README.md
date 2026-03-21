@@ -71,7 +71,9 @@ O sistema utiliza sensores para monitorar a umidade do solo e realiza a irrigaç
 
 **Edcley Vítor**  
 Programador e responsável pela parte eletrônica  
-Projeto PEEX  
+Projeto PEEX 
+**Heslander Matheus**
+editor de vídeo e usuário de canva 
 
 ---
 
