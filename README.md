@@ -188,6 +188,7 @@ largura nao nessesaria
 *Aproximadamente Altura
 são duas fileiras de tijolo oou seja
 14 . 2 = 28 de altura 
+
 ---
 
 ## ⚠️ Estado Atual do Projeto
