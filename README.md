@@ -6,170 +6,193 @@ Sistema inteligente de irrigação automática desenvolvido com ESP32, integraç
 
 ## 📌 Visão Geral
 
-O **PlantAuto PEEX** é um projeto de automação agrícola escolar que combina:
+O **PlantAuto PEEX** é um projeto de automação agrícola escolar que tem como principal objetivo desenvolver um sistema capaz de irrigar plantas de forma automática e inteligente.
 
-* Sensores físicos (umidade do solo)
-* Microcontrolador ESP32
-* APIs públicas de plantas
-* Lógica de cálculo inteligente
-* Estrutura para aprendizado futuro (Machine Learning)
+Diferente de sistemas simples, este projeto combina sensores físicos, análise de dados e integração com APIs para tomar decisões mais precisas. A proposta é reduzir o desperdício de água e melhorar o crescimento das plantas por meio de tecnologia.
 
-O objetivo é criar um sistema capaz de irrigar plantas de forma eficiente, adaptando-se às necessidades específicas de cada cultivo.
+O sistema foi idealizado para aplicação na horta da escola, mas pode ser expandido para outros cenários agrícolas.
 
 ---
 
 ## 🧠 Arquitetura do Projeto
 
-O sistema é dividido em módulos:
+O sistema é dividido em módulos independentes, permitindo organização, escalabilidade e facilidade de manutenção.
+
+Essa separação garante que cada parte do sistema tenha uma função específica, evitando sobrecarga e facilitando futuras melhorias.
+
+---
 
 ### 📱 Frontend (Interface)
 
-Responsável por:
+O frontend é responsável pela interação com o usuário. Ele permite que o usuário pesquise plantas, visualize informações e acompanhe o funcionamento do sistema.
+
+Atualmente, o sistema possui um protótipo em HTML que realiza:
 
 * Busca de plantas
 * Exibição de dados
-* Controle do sistema
+* Simulação do sistema de irrigação
 
-👉 O HTML atual é um **protótipo funcional** usado para testar APIs e lógica.
+Esse protótipo serve como base para testes de APIs e lógica, e será evoluído para uma interface mais completa no futuro.
 
 ---
 
 ### 🌐 APIs Externas
 
+As APIs são utilizadas para complementar o sistema com dados externos.
+
 #### Wikipedia
 
-* Usada apenas para:
+A Wikipedia é utilizada apenas para fins informativos e visuais. Ela fornece:
 
-  * Nome
-  * Imagem
-  * Descrição
+* Nome da planta
+* Descrição
+* Imagens
 
-❗ NÃO usada para decisões técnicas
+Esses dados ajudam o usuário a identificar corretamente a planta, mas não são utilizados para cálculos ou decisões do sistema.
 
 #### Perenual API
 
-* Fornece:
+A Perenual API fornece dados técnicos sobre plantas, especialmente relacionados à irrigação.
 
-  * Nível de irrigação (watering)
+Ela retorna informações como:
+
+* Nível de irrigação (watering)
+
+Esses dados são utilizados como base para os cálculos do sistema.
 
 ---
 
 ### ⚙️ Sistema de Lógica
 
-Responsável por:
+O sistema de lógica é o “cérebro” do projeto. Ele transforma dados em decisões.
 
-* Converter dados da API
-* Calcular irrigação
-* Tomar decisões
+Como as APIs retornam dados qualitativos (como "frequent" ou "minimum"), o sistema realiza uma conversão para valores numéricos.
 
-#### Conversão de dados:
+Exemplo:
 
 * minimum → 0.5
 * average → 1.0
 * frequent → 1.5
 
+Essa conversão permite que o sistema utilize cálculos matemáticos para definir a quantidade de água necessária.
+
 ---
 
 ### 🔌 ESP32 (Hardware)
 
-Responsável por:
+O ESP32 é o responsável pela execução física do sistema.
 
-* Ler sensores de umidade
-* Executar irrigação
-* Receber dados do sistema
+Ele realiza as seguintes funções:
+
+* Leitura do sensor de umidade do solo
+* Processamento dos dados recebidos
+* Ativação da bomba de água
+
+O ESP32 funciona como o executor das decisões tomadas pelo sistema.
 
 ---
 
 ## 🧮 Cálculo de Irrigação
 
-O sistema utiliza a fórmula:
+O sistema utiliza uma fórmula para determinar quanto tempo a irrigação deve ser ativada.
 
 ```
 tempo = (umidadeIdeal - umidadeAtual) × fatorPlanta × constante
 ```
 
-Onde:
+### Explicação:
 
-* umidadeAtual → sensor
-* fatorPlanta → API
-* constante → ajuste empírico
+* **umidadeAtual:** valor obtido pelo sensor
+* **umidadeIdeal:** valor definido como ideal para a planta
+* **fatorPlanta:** definido com base na API
+* **constante:** valor ajustado com testes reais
+
+Essa abordagem permite que o sistema não apenas ligue ou desligue a irrigação, mas ajuste o tempo de forma inteligente.
 
 ---
 
 ## 🗄️ Banco de Dados (Planejado)
 
-Será utilizado SQL para armazenar:
+O sistema utilizará um banco de dados SQL para armazenar informações importantes.
 
-* Plantas
-* Parâmetros
-* Leituras de sensores
+### Dados armazenados:
+
+* Plantas cadastradas
+* Parâmetros de irrigação
+* Leituras dos sensores
 * Histórico de irrigação
 
-### 🎯 Objetivo:
+### Importância:
 
-* Reduzir chamadas de API
-* Aumentar performance
-* Permitir Machine Learning
+O banco de dados permite que o sistema funcione de forma mais eficiente, reduzindo a necessidade de chamadas constantes às APIs e armazenando conhecimento adquirido.
 
 ---
 
 ## 🔁 Sistema de Histórico
 
-O sistema irá registrar:
+O sistema registrará todas as ações realizadas, criando um histórico detalhado.
 
-* Umidade antes/depois
-* Tempo de irrigação
-* Resultado obtido
+Exemplo de dados armazenados:
 
-👉 Base para aprendizado futuro
+* Umidade antes da irrigação
+* Tempo de irrigação aplicado
+* Umidade após irrigação
+
+Esses dados são essenciais para análise e evolução do sistema.
 
 ---
 
 ## 🤖 Machine Learning (Futuro)
 
-O sistema poderá:
+Com base no histórico, o sistema poderá evoluir para um modelo de aprendizado automático.
 
-* Ajustar automaticamente parâmetros
-* Aprender comportamento do solo
-* Otimizar irrigação
+Isso permitirá:
+
+* Ajustar automaticamente os parâmetros
+* Melhorar a eficiência da irrigação
+* Adaptar-se a diferentes condições do solo
+
+Essa etapa transformará o sistema em uma solução inteligente e autônoma.
 
 ---
 
 ## 🌱 Estrutura Física
 
-Canteiros:
+Os canteiros possuem dimensões específicas que influenciam diretamente o sistema.
 
 * 18 tijolos de comprimento
 * 4 tijolos de largura
 * Divisões com 1,5 cm de cimento
 
-Aplicação:
+Essas medidas são importantes para definir:
 
-* Zonas de irrigação
-* Distribuição de sensores
+* Posicionamento dos sensores
+* Distribuição da água
+* Divisão por zonas
 
 ---
 
 ## ⚠️ Estado Atual do Projeto
 
-### ✅ Concluído
+O projeto encontra-se em fase de desenvolvimento.
 
-* Estrutura conceitual
-* Integração com API (teste)
-* Cálculo de irrigação
-* Protótipo frontend
+### Concluído:
 
-### 🚧 Em desenvolvimento
+* Planejamento do sistema
+* Protótipo funcional
+* Integração com API
+* Lógica de cálculo
+
+### Em desenvolvimento:
 
 * Backend
-* Integração com ESP32
+* Integração com hardware
 * Banco de dados
 
-### ❌ Ainda não implementado
+### Futuro:
 
-* Sensor real conectado
-* Sistema online completo
 * Machine Learning
+* Sistema completo online
 
 ---
 
@@ -183,13 +206,15 @@ Aplicação:
 /docs
 ```
 
+Essa organização permitirá melhor controle do projeto.
+
 ---
 
 ## ⚠️ Observações Importantes
 
-* O HTML atual é apenas um teste de API
-* A chave da API deve ser movida para backend
-* O sistema final não dependerá totalmente de APIs
+* O sistema não deve depender exclusivamente de APIs
+* A chave da API deve ser protegida no backend
+* O sensor é a principal fonte de dados confiáveis
 
 ---
 
@@ -197,7 +222,7 @@ Aplicação:
 
 **Edcley Vítor**
 Projeto PEEX
-Programador e responsável pela arquitetura do sistema
+Responsável pela programação e arquitetura do sistema
 
 ---
 
@@ -210,12 +235,7 @@ EETEPA
 
 ## 🚀 Visão do Projeto
 
-Criar um sistema inteligente capaz de unir:
-
-* Automação
-* IoT
-* Inteligência Artificial
-* Sustentabilidade
+Criar um sistema que una tecnologia e agricultura, promovendo sustentabilidade e inovação no ambiente escolar.
 
 ---
 
