@@ -170,23 +170,24 @@ Essas medidas são importantes para definir:
 * Distribuição da água
 * Divisão por zonas
 
-  Tijolo dimeçoes
-  23 cm comprimento
-  14 de altura
-  - largura nao nessesaria
-  *Aproximadamente Comprimeto
-  18 . 23 = 414 cm
-  17 Espaço entre eles que seria o cimento
-  414 + 17 = 431 cm de largura  4 metros e 31 cm
+*Tijolo dimeçoes
+23 cm comprimento
+14 de altura
+largura nao nessesaria
+  
+*Aproximadamente Comprimeto
+18 . 23 = 414 cm
+17 Espaço entre eles que seria o cimento
+414 + 17 = 431 cm de largura  4 metros e 31 cm
 
-  *Aproximadamente largura
-  4 . 23 = 92 cm
-  3 Espaço entre eles que seria o cimento
-  92 + 3 = 95 cm de largura 0 metros e 95 cm
+*Aproximadamente largura
+4 . 23 = 92 cm
+3 Espaço entre eles que seria o cimento
+92 + 3 = 95 cm de largura 0 metros e 95 cm
 
-  *Aproximadamente Altura
-  são duas fileiras de tijolo oou seja
-  14 . 2 = 28 de altura 
+*Aproximadamente Altura
+são duas fileiras de tijolo oou seja
+14 . 2 = 28 de altura 
 ---
 
 ## ⚠️ Estado Atual do Projeto
