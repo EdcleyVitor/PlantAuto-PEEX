@@ -215,19 +215,6 @@ O projeto encontra-se em fase de desenvolvimento.
 
 ---
 
-## 📁 Estrutura do Projeto (Planejada)
-
-```
-/frontend
-/backend
-/esp32
-/database
-/docs
-```
-
-Essa organização permitirá melhor controle do projeto.
-
----
 
 ## ⚠️ Observações Importantes
 
@@ -237,13 +224,6 @@ Essa organização permitirá melhor controle do projeto.
 
 ---
 
-## 👨‍💻 Desenvolvedor
-
-**Edcley Vítor**
-Projeto PEEX
-Responsável pela programação e arquitetura do sistema
-
----
 
 ## 📍 Local
 
