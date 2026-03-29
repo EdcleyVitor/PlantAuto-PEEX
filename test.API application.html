@@ -6,153 +6,169 @@
 <title>PlantAuto PEEX</title>
 
 <style>
-body {
-    font-family: Arial;
-    background: #f4f7f6;
-    padding: 20px;
+*{box-sizing:border-box;}
+body{
+    font-family:'Segoe UI',Arial;
+    background:linear-gradient(135deg,#e8f5e9,#f1f8e9);
+    padding:20px;
 }
-
-.container {
-    max-width: 600px;
-    margin: auto;
-    background: white;
-    padding: 20px;
-    border-radius: 10px;
+.container{
+    max-width:750px;
+    margin:auto;
+    background:white;
+    padding:25px;
+    border-radius:18px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.12);
 }
-
-h1 {
-    text-align: center;
-    color: #2e7d32;
+h1{text-align:center;color:#1b5e20;}
+input{
+    width:100%;padding:12px;margin-top:10px;border-radius:10px;
+    border:1px solid #c8e6c9;font-size:15px;
 }
-
-input, button {
-    width: 100%;
-    padding: 10px;
-    margin-top: 10px;
+button{
+    width:100%;padding:13px;margin-top:12px;border:none;border-radius:12px;
+    background:linear-gradient(135deg,#2e7d32,#43a047);
+    color:white;font-size:16px;font-weight:bold;cursor:pointer;
 }
-
-button {
-    background: #2e7d32;
-    color: white;
-    border: none;
-}
-
-.slider-container {
-    margin-top: 20px;
-}
-
-.result {
-    margin-top: 20px;
-    background: #e8f5e9;
-    padding: 15px;
-    border-left: 5px solid green;
-    display: none;
+.slider-container{margin-top:20px;background:#f9fff9;padding:15px;border-radius:12px;}
+.tabs{display:flex;gap:8px;margin-top:25px;}
+.tab-btn{flex:1;padding:12px;border:none;border-radius:12px;background:#e8f5e9;font-weight:bold;cursor:pointer;}
+.tab-btn.active{background:linear-gradient(135deg,#2e7d32,#43a047);color:white;}
+.tab-content{display:none;}
+.tab-content.active{display:block;}
+.box{background:#f6fff6;padding:18px;border-radius:14px;margin-top:15px;}
+.result{
+    margin-top:20px;background:linear-gradient(135deg,#dcedc8,#c5e1a5);
+    padding:18px;border-radius:14px;border-left:6px solid #2e7d32;
+    display:none;
 }
 </style>
 </head>
 
 <body>
-
 <div class="container">
-    <h1>🌱 PlantAuto PEEX</h1>
+<h1>🌱 PlantAuto PEEX</h1>
 
-    <input id="plantInput" placeholder="Digite a planta (ex: tomate)">
+<input id="plantInput" placeholder="Digite a planta (ex: tomate)">
+<button onclick="buscar()">Calcular Irrigação</button>
 
-    <button onclick="buscar()">Calcular Irrigação</button>
+<div class="slider-container">
+<label>🌡️ Umidade do Solo: <strong id="valorUmidade">50%</strong></label>
+<input type="range" min="0" max="100" value="50" id="sliderUmidade">
+</div>
 
-    <!-- POTENCIÔMETRO -->
-    <div class="slider-container">
-        <label>🌡️ Umidade do Solo (Sensor): <strong id="valorUmidade">50%</strong></label>
-        <input type="range" min="0" max="100" value="50" id="sliderUmidade">
-    </div>
+<div class="tabs">
+<button class="tab-btn active" onclick="trocarAba('irrigacao')">🌱 Irrigação</button>
+<button class="tab-btn" onclick="trocarAba('api')">🌐 Dados da API</button>
+<button class="tab-btn" onclick="trocarAba('calibracao')">⚙️ Calibração</button>
+</div>
 
-    <div id="resultado" class="result">
-        <h3 id="nome"></h3>
-        <p><strong>Fator:</strong> <span id="fator"></span></p>
-        <p><strong>Ação:</strong> <span id="acao"></span></p>
-        <p><strong>Tempo:</strong> <span id="tempo"></span></p>
-    </div>
+<!-- IRRIGAÇÃO -->
+<div id="irrigacao" class="tab-content active">
+<div id="resultado" class="result">
+<h3 id="nome"></h3>
+<p><strong>Ação:</strong> <span id="acao"></span></p>
+<p><strong>Tempo:</strong> <span id="tempo"></span></p>
+</div>
+</div>
+
+<!-- API -->
+<div id="api" class="tab-content">
+<div id="apiBox" class="box" style="display:none">
+<h3>Dados da Planta 🌿</h3>
+<p><strong>Nome científico:</strong> <span id="apiScientific"></span></p>
+<p><strong>Tipo:</strong> <span id="apiIndoor"></span></p>
+<p><strong>Ciclo:</strong> <span id="apiCycle"></span></p>
+<p><strong>Luz solar:</strong> <span id="apiSun"></span></p>
+<p><strong>Rega da API:</strong> <span id="apiWater"></span></p>
+<p><strong>ID:</strong> <span id="apiID"></span></p>
+</div>
+</div>
+
+<!-- CALIBRAÇÃO -->
+<div id="calibracao" class="tab-content">
+<div class="box">
+<h3>Calibração da Bomba 💧</h3>
+<label>Água coletada (ml)</label>
+<input id="mlBomba" type="number">
+<label>Tempo ligado (segundos)</label>
+<input id="segBomba" type="number">
+<button onclick="calcularVazao()">Calcular Vazão</button>
+<p><strong>Vazão:</strong> <span id="vazaoTxt">Não calibrada</span></p>
+</div>
+</div>
+
 </div>
 
 <script>
-const API_KEY = 'sk-8rAC69c6cb1258bb115655';
-const UMIDADE_IDEAL = 70;
-const AJUSTE = 2.5;
+const API_KEY="sk-8rAC69c6cb1258bb115655"; //API LIBERADA
+const UMIDADE_IDEAL=70;
 
-// Atualiza valor do slider (potenciômetro)
-const slider = document.getElementById('sliderUmidade');
-const valorTexto = document.getElementById('valorUmidade');
+let VAZAO_BOMBA=localStorage.getItem("vazao")||0;
+if(VAZAO_BOMBA>0)vazaoTxt.innerText=VAZAO_BOMBA+" ml/s";
 
-slider.oninput = () => {
-    valorTexto.innerText = slider.value + "%";
-};
+sliderUmidade.oninput=()=>valorUmidade.innerText=sliderUmidade.value+"%";
 
-// Tradução
-async function traduzir(texto, de, para) {
-    try {
-        const res = await fetch(
-            `https://api.mymemory.translated.net/get?q=${texto}&langpair=${de}|${para}`
-        );
-        const data = await res.json();
-        return data.responseData.translatedText || texto;
-    } catch {
-        return texto;
-    }
+function trocarAba(id){
+document.querySelectorAll(".tab-content").forEach(t=>t.classList.remove("active"));
+document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+document.getElementById(id).classList.add("active");
+document.querySelectorAll(".tab-btn")[id==="irrigacao"?0:id==="api"?1:2].classList.add("active");
 }
 
-// Função principal
-async function buscar() {
-    const nomePT = document.getElementById('plantInput').value.trim();
-    if (!nomePT) return alert("Digite uma planta");
+function calcularVazao(){
+const ml=parseFloat(mlBomba.value);
+const seg=parseFloat(segBomba.value);
+if(!ml||!seg)return alert("Preencha os valores");
+VAZAO_BOMBA=(ml/seg).toFixed(2);
+localStorage.setItem("vazao",VAZAO_BOMBA);
+vazaoTxt.innerText=VAZAO_BOMBA+" ml/s";
+}
 
-    try {
-        // traduz
-        const nomeEN = await traduzir(nomePT, 'pt', 'en');
+async function traduzir(texto,de,para){
+try{
+const r=await fetch(`https://api.mymemory.translated.net/get?q=${texto}&langpair=${de}|${para}`);
+const d=await r.json();
+return d.responseData.translatedText||texto;
+}catch{return texto;}
+}
+function seguro(v){if(!v)return"Não disponível";if(Array.isArray(v))return v.join(", ");return v;}
 
-        // API plantas (com proxy)
-        const res = await fetch(
-            `https://corsproxy.io/?https://perenual.com/api/species-list?key=${API_KEY}&q=${nomeEN}`
-        );
+async function buscar(){
+const nomePT=plantInput.value.trim();
+if(!nomePT)return alert("Digite uma planta");
 
-        const data = await res.json();
-        const planta = data.data[0];
+const nomeEN=await traduzir(nomePT,"pt","en");
+const res=await fetch(`https://corsproxy.io/?https://perenual.com/api/species-list?key=${API_KEY}&q=${nomeEN}`);
+const data=await res.json();
+const planta=data.data[0];
 
-        const watering = planta.watering?.toLowerCase() || 'average';
+let aguaML=300;
+const watering=planta.watering?.toLowerCase()||"average";
+if(watering.includes("minimum"))aguaML=150;
+if(watering.includes("frequent"))aguaML=500;
 
-        let fator = 1;
-        if (watering.includes('minimum')) fator = 0.5;
-        if (watering.includes('frequent')) fator = 1.5;
+const falta=(UMIDADE_IDEAL-sliderUmidade.value)/100;
+aguaML*=falta;
 
-        // valor do potenciômetro (sensor)
-        const umidade = parseInt(slider.value);
+let tempoTxt="—"; let acaoTxt="⚠️ Calibre a bomba";
+if(VAZAO_BOMBA>0){
+tempoTxt=(aguaML/VAZAO_BOMBA).toFixed(1)+" segundos";
+acaoTxt="💧 Irrigar planta";
+}
 
-        let acao = "";
-        let tempo = "";
+nome.innerText=await traduzir(planta.common_name||nomeEN,"en","pt");
+acao.innerText=acaoTxt;
+tempo.innerText=tempoTxt;
+resultado.style.display="block";
 
-        if (umidade >= UMIDADE_IDEAL) {
-            acao = "✅ Solo já está úmido";
-            tempo = "0s";
-        } else {
-            const tempoCalc = (UMIDADE_IDEAL - umidade) * fator * AJUSTE;
-            acao = "💧 Irrigar planta";
-            tempo = tempoCalc.toFixed(1) + " segundos";
-        }
-
-        // traduz nome final
-        const nomeFinal = await traduzir(planta.common_name || nomeEN, 'en', 'pt');
-
-        // UI
-        document.getElementById('nome').innerText = nomeFinal;
-        document.getElementById('fator').innerText = fator;
-        document.getElementById('acao').innerText = acao;
-        document.getElementById('tempo').innerText = tempo;
-
-        document.getElementById('resultado').style.display = 'block';
-
-    } catch (err) {
-        alert("Erro na API ou conexão");
-        console.error(err);
-    }
+apiScientific.innerText=seguro(planta.scientific_name?.[0]);
+apiIndoor.innerText=planta.indoor?"Interna":"Externa";
+apiCycle.innerText=seguro(planta.cycle);
+apiSun.innerText=seguro(planta.sunlight);
+apiWater.innerText=seguro(planta.watering);
+apiID.innerText=seguro(planta.id);
+apiBox.style.display="block";
 }
 </script>
 
