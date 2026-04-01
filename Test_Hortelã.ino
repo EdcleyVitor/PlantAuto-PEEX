@@ -1,5 +1,5 @@
 //Construido por Edcley no dia 31 para teste de codico base  o codigo será testado e verificado diariamente em hortelã
-// para o projeto Peex.
+// para o projeto Peex...
 
 const int pinoSensor = A0;
 const int pinoMotor  = 13; // Relé
