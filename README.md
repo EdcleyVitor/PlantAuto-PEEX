@@ -1,7 +1,6 @@
 # 🌱 PlantAuto PEEX
 
-Sistema inteligente de irrigação automática desenvolvido com ESP32, integração com APIs públicas e arquitetura preparada para Machine Learning.
-
+Sistema inteligente de irrigação automática desenvolvido com ESP32, integração com APIs públicas e arquitetura preparada.
 ---
 
 ## 📌 Visão Geral
@@ -30,7 +29,7 @@ Atualmente, o sistema possui um protótipo em HTML que realiza:
 
 * Busca de plantas
 * Exibição de dados
-* Simulação do sistema de irrigação
+* Entrega o tempo de Irrigação com base na taxa de vazão.
 
 Esse protótipo serve como base para testes de APIs e lógica, e será evoluído para uma interface mais completa no futuro.
 
@@ -39,16 +38,6 @@ Esse protótipo serve como base para testes de APIs e lógica, e será evoluído
 ### 🌐 APIs Externas
 
 As APIs são utilizadas para complementar o sistema com dados externos.
-
-#### Wikipedia
-
-A Wikipedia é utilizada apenas para fins informativos e visuais. Ela fornece:
-
-* Nome da planta
-* Descrição
-* Imagens
-
-Esses dados ajudam o usuário a identificar corretamente a planta, mas não são utilizados para cálculos ou decisões do sistema.
 
 #### Perenual API
 
