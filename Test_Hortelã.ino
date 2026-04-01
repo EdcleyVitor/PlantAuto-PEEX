@@ -1,4 +1,4 @@
-//Construido por Edcley no dia 31 para teste de codico base  o codico será testado e verificado diariamente em hortelã
+//Construido por Edcley no dia 31 para teste de codico base  o codigo será testado e verificado diariamente em hortelã
 // para o projeto Peex.
 
 const int pinoSensor = A0;
