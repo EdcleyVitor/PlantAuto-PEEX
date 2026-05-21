@@ -182,14 +182,7 @@ são duas fileiras de tijolo oou seja
 
 ## ⚠️ Estado Atual do Projeto
 
-O projeto encontra-se em fase de desenvolvimento.
-
 ### Concluído:
-
-* Planejamento do sistema
-* Protótipo funcional
-* Integração com API
-* Lógica de cálculo
 
 ### Em desenvolvimento:
 
@@ -208,8 +201,8 @@ O projeto encontra-se em fase de desenvolvimento.
 ## ⚠️ Observações Importantes
 
 * O sistema não deve depender exclusivamente de APIs
-* A chave da API deve ser protegida no backend
 * O sensor é a principal fonte de dados confiáveis
+* O problema observado a diferença de temperatuda da água{os eletrons tem dificudade passar em aguá mais fria}
 
 ---
 
