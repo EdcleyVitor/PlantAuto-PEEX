@@ -20,6 +20,11 @@ class RelatoriosScreen extends StatelessWidget {
   final List<Leitura> leituras;
   final bool conectado;
 
+  // Compressão de períodos parados nos gráficos do PDF: leitura repetida
+  // por mais de 10 min ocupa no máximo 90s no eixo do tempo.
+  static const double _flatMinSeg = 600;
+  static const double _flatCapSeg = 90;
+
   Future<void> _gerarPdf(BuildContext context) async {
     if (leituras.isEmpty) {
       if (context.mounted) {
@@ -646,12 +651,13 @@ class RelatoriosScreen extends StatelessWidget {
   }
 
   /// Gera os valores do eixo Y com passos "bonitos" cobrindo [lo]..[hi].
-  List<double> _ticksY(double lo, double hi) {
+  /// [divisoes] controla a densidade (mais divisões = mais números no eixo).
+  List<double> _ticksY(double lo, double hi, {int divisoes = 3}) {
     if (hi - lo < 1e-9) {
       lo -= 1;
       hi += 1;
     }
-    final passo = _passoBonitoEixo((hi - lo) / 3);
+    final passo = _passoBonitoEixo((hi - lo) / divisoes);
     final inicio = (lo / passo).floor() * passo;
     final res = <double>[];
     for (var v = inicio; v <= hi + passo * 0.001; v += passo) {
@@ -660,53 +666,102 @@ class RelatoriosScreen extends StatelessWidget {
     return res;
   }
 
-  /// Um bloco de gráfico do PDF: título + Chart com eixos rotulados.
-  pw.Widget _blocoGraficoPdf({
-    required String titulo,
-    required List<pw.PointChartValue> pontos,
-    required double x0,
-    required double x1,
-    required bool horas,
-    PdfColor cor = PdfColors.blue700,
-    bool curva = true,
-    pw.LineDataSet? extra,
-  }) {
-    final ys = pontos.map((p) => p.y).toList();
-    final yTicks = _ticksY(ys.reduce(min), ys.reduce(max));
-    final xTicks = List<double>.generate(
-        5, (i) => x0 + (x1 - x0) * i / 4);
+  /// Série pronta para o gráfico do PDF, com o eixo X já comprimido nos
+  /// períodos em que a leitura ficou parada (repetições).
+  _SerieGrafico _serieComprimida(List<Leitura> vs,
+      double Function(Leitura) f, int maxPontos, bool horas) {
+    final pts = _pontosPdf(vs, f, maxPontos);
 
-    String fmtX(num v) {
-      final t = DateTime.fromMillisecondsSinceEpoch((v * 1000).round());
-      if (horas) {
-        return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-      }
-      return '${t.day.toString().padLeft(2, '0')}/${t.month.toString().padLeft(2, '0')}';
+    // Tolerância para considerar dois valores "iguais" (repetição).
+    var lo = pts.first.y;
+    var hi = pts.first.y;
+    for (final p in pts) {
+      if (p.y < lo) lo = p.y;
+      if (p.y > hi) hi = p.y;
     }
+    final eps = 0.005 * ((hi - lo) == 0 ? 1 : (hi - lo));
+
+    // Eixo X virtual: quando o valor fica parado por mais de 10 minutos,
+    // esse tempo é comprimido para no máx. 90s — assim o gráfico mostra
+    // só o que importa ("quando ele funcionou") sem apagar os dados.
+    final xs = <double>[0];
+    for (var i = 1; i < pts.length; i++) {
+      final dt = pts[i].x - pts[i - 1].x;
+      final parado = (pts[i].y - pts[i - 1].y).abs() <= eps;
+      var passo = dt;
+      if (parado && dt > _flatMinSeg) {
+        passo = _flatCapSeg + (dt % 60);
+      }
+      xs.add(xs.last + passo);
+    }
+    final pontos = [
+      for (var i = 0; i < pts.length; i++) pw.PointChartValue(xs[i], pts[i].y),
+    ];
+
+    // Âncoras do eixo X: 6 pontos reais da série, cada um rotulado com o
+    // HORÁRIO VERDADEIRO daquele momento.
+    final xTicks = <double>[];
+    final rotulos = <String>[];
+    const nAncoras = 6;
+    for (var k = 0; k < nAncoras; k++) {
+      final idx =
+          ((pts.length - 1) * k / (nAncoras - 1)).round();
+      if (xTicks.isNotEmpty && xs[idx] <= xTicks.last) continue;
+      xTicks.add(xs[idx]);
+      final t = DateTime.fromMillisecondsSinceEpoch(
+          (pts[idx].x * 1000).round());
+      rotulos.add(horas
+          ? '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}'
+          : '${t.day.toString().padLeft(2, '0')}/${t.month.toString().padLeft(2, '0')}');
+    }
+    return _SerieGrafico(pontos, xTicks, rotulos);
+  }
+
+  /// Uma PÁGINA INTEIRA de PDF dedicada a um único gráfico, no tamanho
+  /// máximo que cabe na folha A4.
+  pw.Widget _paginaGraficoPdf({
+    required String titulo,
+    required String subtitulo,
+    required _SerieGrafico serie,
+    required PdfColor cor,
+    required bool curva,
+    pw.LineDataSet Function(_SerieGrafico s)? extraBuilder,
+  }) {
+    final ys = serie.pontos.map((p) => p.y).toList();
+    final yTicks = _ticksY(ys.reduce(min), ys.reduce(max), divisoes: 6);
+
+    final rotuloPorTick = <double, String>{
+      for (var i = 0; i < serie.xTicks.length; i++)
+        serie.xTicks[i]: serie.rotulosX[i],
+    };
+    String fmtX(num v) => rotuloPorTick[v.toDouble()] ?? '';
 
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
         pw.Text(titulo,
             style: pw.TextStyle(
-                fontSize: 11, fontWeight: pw.FontWeight.bold)),
-        pw.SizedBox(height: 4),
+                fontSize: 15, fontWeight: pw.FontWeight.bold)),
+        pw.SizedBox(height: 2),
+        pw.Text(subtitulo,
+            style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+        pw.SizedBox(height: 8),
         pw.Container(
-          height: 150,
+          height: 680,
           child: pw.Chart(
             left: pw.ChartLegend(
               direction: pw.Axis.vertical,
-              textStyle: const pw.TextStyle(fontSize: 7),
+              textStyle: const pw.TextStyle(fontSize: 8),
               position: pw.Alignment.topCenter,
               padding: const pw.EdgeInsets.only(right: 4),
             ),
             bottom: pw.ChartLegend(
               direction: pw.Axis.horizontal,
-              textStyle: const pw.TextStyle(fontSize: 7),
+              textStyle: const pw.TextStyle(fontSize: 8),
               padding: const pw.EdgeInsets.only(top: 2),
             ),
             grid: pw.CartesianGrid(
-              xAxis: pw.FixedAxis<double>(xTicks,
+              xAxis: pw.FixedAxis<double>(serie.xTicks,
                   format: fmtX, divisions: true, ticks: true),
               yAxis: pw.FixedAxis<double>(yTicks,
                   format: (v) => v.toStringAsFixed(v % 1 == 0 ? 0 : 1),
@@ -716,9 +771,9 @@ class RelatoriosScreen extends StatelessWidget {
                   marginEnd: 10),
             ),
             datasets: [
-              if (extra != null) extra,
+              if (extraBuilder != null) extraBuilder(serie),
               pw.LineDataSet(
-                data: pontos,
+                data: serie.pontos,
                 legend: titulo,
                 color: cor,
                 lineColor: cor,
@@ -732,15 +787,16 @@ class RelatoriosScreen extends StatelessWidget {
             ],
           ),
         ),
-        pw.SizedBox(height: 14),
       ],
     );
   }
 
-  /// Seção "Gráficos" do PDF: um gráfico para cada leitura (solo, ar,
-  /// temperatura, vazão, consumo e irrigações), depois da tabela de dados.
+  /// Seção "Gráficos" do PDF: UM GRÁFICO POR PÁGINA, no tamanho máximo,
+  /// para todas as leituras (solo, ar, temperatura, vazão, consumo e
+  /// irrigações). Períodos parados são comprimidos e os rótulos mostram o
+  /// horário real de cada ponto.
   List<pw.Widget> _secaoGraficosPdf(List<Leitura> ordenadas) {
-    final blocos = <pw.Widget>[];
+    final paginas = <pw.Widget>[];
 
     List<Leitura> filtrar(double Function(Leitura) f,
         {double? fMin, double? fMax}) {
@@ -755,90 +811,95 @@ class RelatoriosScreen extends StatelessWidget {
 
     void adicionar({
       required String titulo,
-      required List<Leitura> serie,
+      required List<Leitura> serieBruta,
       required double Function(Leitura) f,
       PdfColor cor = PdfColors.blue700,
       bool curva = true,
-      pw.LineDataSet? extra,
+      pw.LineDataSet Function(_SerieGrafico s)? extraBuilder,
     }) {
-      if (serie.length < 2) return;
+      if (serieBruta.length < 2) return;
       final x0 =
-          serie.first.tempo.millisecondsSinceEpoch / 1000.0;
-      final x1 = serie.last.tempo.millisecondsSinceEpoch / 1000.0;
+          serieBruta.first.tempo.millisecondsSinceEpoch / 1000.0;
+      final x1 = serieBruta.last.tempo.millisecondsSinceEpoch / 1000.0;
       final spanHoras = (x1 - x0) / 3600.0;
-      blocos.add(_blocoGraficoPdf(
+      final serie = _serieComprimida(serieBruta, f, 400, spanHoras < 24);
+      if (serie.pontos.length < 2) return;
+
+      final ys = serie.pontos.map((p) => p.y).toList();
+      final minY = ys.reduce(min);
+      final maxY = ys.reduce(max);
+      final media = ys.fold<double>(0, (a, b) => a + b) / ys.length;
+      final casas = maxY - minY < 5 ? 2 : (maxY - minY < 20 ? 1 : 0);
+      String n(double v) => v.toStringAsFixed(casas);
+
+      paginas.add(pw.NewPage());
+      paginas.add(_paginaGraficoPdf(
         titulo: titulo,
-        pontos: _pontosPdf(serie, f, 120),
-        x0: x0,
-        x1: x1,
-        horas: spanHoras < 24,
+        subtitulo:
+            'Mínimo ${n(minY)} • Média ${n(media)} • Máximo ${n(maxY)} • '
+            '${ys.length} pontos • períodos parados comprimidos no eixo do tempo',
+        serie: serie,
         cor: cor,
         curva: curva,
-        extra: extra,
+        extraBuilder: extraBuilder,
       ));
     }
 
     // Solo: inclui a linha da umidade ideal (verde).
-    final solo = filtrar((l) => l.umidadeSolo.toDouble(),
-        fMin: 0, fMax: 100);
-    if (solo.length >= 2) {
-      final x0 = solo.first.tempo.millisecondsSinceEpoch / 1000.0;
-      final x1 = solo.last.tempo.millisecondsSinceEpoch / 1000.0;
-      final ideal = planta.umidadeIdeal.toDouble();
-      adicionar(
-        titulo:
-            'Umidade do solo (%) — linha verde = ideal ${planta.umidadeIdeal}%',
-        serie: solo,
-        f: (l) => l.umidadeSolo.toDouble(),
-        cor: PdfColors.blue700,
-        extra: pw.LineDataSet(
-          data: [
-            pw.PointChartValue(x0, ideal),
-            pw.PointChartValue(x1, ideal),
-          ],
-          legend: 'Ideal',
-          color: PdfColors.green600,
-          lineColor: PdfColors.green600,
-          lineWidth: 0.9,
-          drawPoints: false,
-        ),
-      );
-    }
-
+    adicionar(
+      titulo:
+          'Umidade do solo (%) — linha verde = ideal ${planta.umidadeIdeal}%',
+      serieBruta:
+          filtrar((l) => l.umidadeSolo.toDouble(), fMin: 0, fMax: 100),
+      f: (l) => l.umidadeSolo.toDouble(),
+      cor: PdfColors.blue700,
+      extraBuilder: (s) => pw.LineDataSet(
+        data: [
+          pw.PointChartValue(s.pontos.first.x, planta.umidadeIdeal.toDouble()),
+          pw.PointChartValue(s.pontos.last.x, planta.umidadeIdeal.toDouble()),
+        ],
+        legend: 'Ideal',
+        color: PdfColors.green600,
+        lineColor: PdfColors.green600,
+        lineWidth: 0.9,
+        drawPoints: false,
+      ),
+    );
     adicionar(
       titulo: 'Umidade do ar (%)',
-      serie: filtrar((l) => l.umidadeAr.toDouble(), fMin: 0, fMax: 100),
+      serieBruta:
+          filtrar((l) => l.umidadeAr.toDouble(), fMin: 0, fMax: 100),
       f: (l) => l.umidadeAr.toDouble(),
       cor: PdfColors.teal,
     );
     adicionar(
       titulo: 'Temperatura (°C)',
-      serie: filtrar((l) => l.temperatura, fMin: -40, fMax: 80),
+      serieBruta: filtrar((l) => l.temperatura, fMin: -40, fMax: 80),
       f: (l) => l.temperatura,
       cor: PdfColors.orange700,
     );
     adicionar(
       titulo: 'Vazão (L/min)',
-      serie: filtrar((l) => l.vazao, fMin: 0),
+      serieBruta: filtrar((l) => l.vazao, fMin: 0),
       f: (l) => l.vazao,
       cor: PdfColors.cyan700,
       curva: false,
     );
     adicionar(
       titulo: 'Consumo acumulado (L)',
-      serie: filtrar((l) => l.litros, fMin: 0),
+      serieBruta: filtrar((l) => l.litros, fMin: 0),
       f: (l) => l.litros,
       cor: PdfColors.indigo,
     );
     adicionar(
       titulo: 'Irrigações hoje (acumulado do dia)',
-      serie: filtrar((l) => l.irrigacoesHoje.toDouble(), fMin: 0),
+      serieBruta: filtrar((l) => l.irrigacoesHoje.toDouble(), fMin: 0),
       f: (l) => l.irrigacoesHoje.toDouble(),
       cor: PdfColors.purple,
       curva: false,
     );
 
-    return blocos;
+    return paginas;
   }
 }
 
@@ -858,6 +919,15 @@ double _passoBonitoEixo(double faixa) {
     if (bruto <= m * mag) return m * mag;
   }
   return 10 * mag;
+}
+
+/// Série preparada para os gráficos do PDF: pontos com o eixo X já
+/// comprimido nos períodos parados + rótulos de horário real das âncoras.
+class _SerieGrafico {
+  _SerieGrafico(this.pontos, this.xTicks, this.rotulosX);
+  final List<pw.PointChartValue> pontos;
+  final List<double> xTicks;
+  final List<String> rotulosX;
 }
 
 /// Linha de referência desenhada sobre o gráfico (ex.: umidade ideal).
