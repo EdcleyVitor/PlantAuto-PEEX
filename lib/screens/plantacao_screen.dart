@@ -5,7 +5,6 @@ import '../services/bluetooth_service.dart';
 import '../services/plantacao_store.dart';
 import 'adicionar_planta_screen.dart';
 import 'planta_detail_screen.dart';
-import '../widgets/botao_parar_rega.dart';
 
 class PlantacaoScreen extends StatelessWidget {
   const PlantacaoScreen({super.key});
@@ -30,24 +29,16 @@ class PlantacaoScreen extends StatelessWidget {
                       ),
                   ],
                 ),
-          floatingActionButton: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              const BotaoPararRega(),
-              const SizedBox(height: 12),
-              FloatingActionButton.extended(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const AdicionarPlantaScreen(),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.add),
-                label: const Text('Adicionar Planta'),
-              ),
-            ],
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const AdicionarPlantaScreen(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.add),
+            label: const Text('Adicionar Planta'),
           ),
         );
       },

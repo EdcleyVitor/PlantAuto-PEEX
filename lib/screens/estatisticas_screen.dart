@@ -432,30 +432,100 @@ class _HeatmapCard extends StatelessWidget {
   final BluetoothService bt;
   final int irrigacoesHoje;
 
+  static const double _tam = 13;
+  static const double _gap = 2.5;
+
+  // Escala de verdes do GitHub (contribuições).
+  static const List<Color> _verdes = [
+    Color(0xFF9BE9A8),
+    Color(0xFF40C463),
+    Color(0xFF30A14E),
+    Color(0xFF216E39),
+  ];
+
+  static const List<String> _meses = [
+    'jan', 'fev', 'mar', 'abr', 'mai', 'jun',
+    'jul', 'ago', 'set', 'out', 'nov', 'dez',
+  ];
+
+  // Rótulos das linhas (domingo no topo): mostra Seg, Qua e Sex como no GitHub.
+  static const List<String> _rotuloLinha = ['', 'Seg', '', 'Qua', '', 'Sex', ''];
+
+  String _chave(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
   @override
   Widget build(BuildContext context) {
     final cores = Theme.of(context).colorScheme;
     final regas = bt.regasPorDia;
-    final hoje = DateTime.now();
-    const totalDias = 70;
+    final agora = DateTime.now();
+    final hoje = DateTime(agora.year, agora.month, agora.day);
 
-    int contar(int offset) {
-      final dia = hoje.subtract(Duration(days: offset));
-      final chave = '${dia.year}-${dia.month.toString().padLeft(2, '0')}-${dia.day.toString().padLeft(2, '0')}';
-      return regas[chave] ?? 0;
-    }
+    // Janela de 70 dias terminando hoje, com as colunas alinhadas às semanas:
+    // domingo na primeira linha, sábado na última (igual ao GitHub).
+    final primeiroDia = hoje.subtract(const Duration(days: 69));
+    final inicio =
+        primeiroDia.subtract(Duration(days: primeiroDia.weekday % 7));
+    final totalColunas = ((hoje.difference(inicio).inDays + 1) / 7).ceil();
 
-    var maxV = 0;
-    for (var i = 0; i < totalDias; i++) {
-      final c = contar(i);
+    int contar(DateTime dia) => regas[_chave(dia)] ?? 0;
+
+    var maxV = 1;
+    var total = 0;
+    for (DateTime d = inicio;
+        !d.isAfter(hoje);
+        d = d.add(const Duration(days: 1))) {
+      final c = contar(d);
+      total += c;
       if (c > maxV) maxV = c;
     }
-    if (maxV == 0) maxV = 1;
+
+    int nivel(int c) => c <= 0 ? 0 : ((c * 4) / maxV).ceil().clamp(1, 4);
+
+    // Rótulo do mês na primeira coluna de cada mês (como no GitHub).
+    final rotuloMes = <int, String>{};
+    for (var col = 0; col < totalColunas; col++) {
+      final d = inicio.add(Duration(days: col * 7));
+      final anterior =
+          col == 0 ? null : inicio.add(Duration(days: (col - 1) * 7));
+      if (anterior == null || d.month != anterior.month) {
+        rotuloMes[col] = _meses[d.month - 1];
+      }
+    }
+
+    final corVazia = cores.onSurface.withValues(alpha: 0.08);
+    final corRotulo =
+        TextStyle(fontSize: 9, color: cores.onSurfaceVariant);
+
+    Widget celula(DateTime dia) {
+      final futuro = dia.isAfter(hoje);
+      final c = futuro ? 0 : contar(dia);
+      final n = futuro ? 0 : nivel(c);
+      final quadro = Container(
+        width: _tam,
+        height: _tam,
+        margin: EdgeInsets.only(right: _gap, bottom: _gap),
+        decoration: BoxDecoration(
+          color: futuro
+              ? Colors.transparent
+              : (n == 0 ? corVazia : _verdes[n - 1]),
+          borderRadius: BorderRadius.circular(3),
+        ),
+      );
+      if (futuro) return quadro;
+      return Tooltip(
+        triggerMode: TooltipTriggerMode.tap,
+        message: '${dia.day.toString().padLeft(2, '0')}/'
+            '${dia.month.toString().padLeft(2, '0')} • '
+            '$c rega${c == 1 ? '' : 's'}',
+        child: quadro,
+      );
+    }
 
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      color: cores.surfaceContainerHighest,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -463,11 +533,15 @@ class _HeatmapCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.grid_on, size: 20, color: Colors.blue),
+                const Icon(Icons.grid_on,
+                    size: 20, color: Color(0xFF30A14E)),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text('Histórico de irrigação (70 dias)',
-                      style: Theme.of(context).textTheme.titleSmall),
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleSmall
+                          ?.copyWith(fontWeight: FontWeight.bold)),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -482,49 +556,84 @@ class _HeatmapCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(width: 14),
-                Expanded(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    reverse: true,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        for (var col = 0; col < (totalDias ~/ 7); col++)
-                          Row(
-                            children: [
-                              for (var lin = 0; lin < 7; lin++)
-                                _CellReza(
-                                  intensidade: contar(
-                                          ((totalDias ~/ 7) - 1 - col) * 7 +
-                                              (6 - lin)) /
-                                      maxV,
-                                ),
-                            ],
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+            const SizedBox(height: 4),
+            Text(
+              '$total regas nos últimos 70 dias • pico de $maxV num único dia. '
+              'Toque num quadrado para ver o dia.',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 12),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              reverse: true,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const SizedBox(width: 32),
+                      for (var col = 0; col < totalColunas; col++)
+                        SizedBox(
+                          width: _tam + _gap,
+                          child: Text(rotuloMes[col] ?? '',
+                              style: corRotulo),
+                        ),
+                    ],
+                  ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 32,
+                        child: Column(
+                          children: [
+                            for (var lin = 0; lin < 7; lin++)
+                              SizedBox(
+                                height: _tam + _gap,
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(_rotuloLinha[lin],
+                                      style: corRotulo),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      for (var col = 0; col < totalColunas; col++)
+                        Column(
+                          children: [
+                            for (var lin = 0; lin < 7; lin++)
+                              celula(inicio
+                                  .add(Duration(days: col * 7 + lin))),
+                          ],
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 Text('Menos', style: Theme.of(context).textTheme.bodySmall),
                 const SizedBox(width: 4),
-                for (var i = 0; i < 5; i++)
+                Container(
+                  width: 11,
+                  height: 11,
+                  margin: const EdgeInsets.symmetric(horizontal: 1),
+                  decoration: BoxDecoration(
+                    color: corVazia,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                for (final v in _verdes)
                   Container(
-                    width: 10,
-                    height: 10,
+                    width: 11,
+                    height: 11,
                     margin: const EdgeInsets.symmetric(horizontal: 1),
                     decoration: BoxDecoration(
-                      color: _corCell(i / 5, cores),
+                      color: v,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -534,34 +643,6 @@ class _HeatmapCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-Color _corCell(double intensidade, ColorScheme cores) {
-  if (intensidade <= 0) {
-    return cores.surfaceContainerHighest;
-  }
-  const baixo = Color(0xFFBBDEFB);
-  const alto = Color(0xFF0D47A1);
-  return Color.lerp(baixo, alto, intensidade.clamp(0.0, 1.0))!;
-}
-
-class _CellReza extends StatelessWidget {
-  const _CellReza({required this.intensidade});
-  final double intensidade;
-
-  @override
-  Widget build(BuildContext context) {
-    final cores = Theme.of(context).colorScheme;
-    return Container(
-      width: 11,
-      height: 11,
-      margin: const EdgeInsets.symmetric(horizontal: 1.5, vertical: 1.5),
-      decoration: BoxDecoration(
-        color: _corCell(intensidade, cores),
-        borderRadius: BorderRadius.circular(3),
       ),
     );
   }

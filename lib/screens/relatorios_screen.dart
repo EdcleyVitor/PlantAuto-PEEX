@@ -1,3 +1,5 @@
+import 'dart:math';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -68,18 +70,32 @@ class RelatoriosScreen extends StatelessWidget {
         return '${d.inMinutes} min';
       }
 
-      String fmtDuracaoSec(int sec) => fmtDuracao(Duration(seconds: sec));
+      // Formato "min e seg" para a coluna Durou: mostra quanto tempo a
+      // leitura ficou REPETINDO. Ex.: 185s -> "3min 5s"; 45s -> "45s";
+      // leitura que não repetiu (durou menos de 1s) -> "0s".
+      String fmtDuracaoSec(int sec) {
+        if (sec <= 0) return '0s';
+        final h = sec ~/ 3600;
+        final m = (sec % 3600) ~/ 60;
+        final s = sec % 60;
+        final partes = <String>[
+          if (h > 0) '${h}h',
+          if (m > 0) '${m}min',
+          if (s > 0 && h == 0) '${s}s',
+        ];
+        return partes.isEmpty ? '0s' : partes.join(' ');
+      }
 
-      // Duração que o valor durou. Prefere a duração gravada pelo ESP32;
-      // se não veio, calcula até a próxima leitura (ou até agora, na última).
+      // Duração da repetição da leitura. Usa a duração gravada pelo ESP32
+      // (tempo em que o valor ficou igual); na última linha, conta até agora
+      // porque a leitura ainda está valendo. Sem repetição -> "0s".
       String duracaoRelatorio(List<Leitura> linhas, int i) {
         final l = linhas[i];
-        if (l.duracao > 0) return fmtDuracaoSec(l.duracao);
-        if (i < linhas.length - 1) {
-          return fmtDuracao(linhas[i + 1].tempo.difference(l.tempo));
+        var seg = l.duracao;
+        if (seg <= 0 && i == linhas.length - 1) {
+          seg = DateTime.now().difference(l.tempo).inSeconds;
         }
-        final ateAgora = DateTime.now().difference(l.tempo);
-        return ateAgora.inSeconds > 0 ? fmtDuracao(ateAgora) : '-';
+        return fmtDuracaoSec(seg);
       }
 
       doc.addPage(
@@ -145,8 +161,8 @@ class RelatoriosScreen extends StatelessWidget {
                 '- Irrigações hoje: $regasHoje\n'
                 '- Consumo acumulado hoje: ${litrosHoje.toStringAsFixed(2)} L\n'
                 '- Histórico cobre: ${fmtDuracao(cobertura)} '
-                '(leituras repetidas não são gravadas; cada linha mostra '
-                'quanto tempo o valor durou)\n'
+                '(leituras repetidas não são gravadas; a coluna Durou mostra '
+                'quanto tempo cada leitura ficou repetindo — 0s se mudou na hora)\n'
                 '- Configuração: umidade ideal ${planta.umidadeIdeal}%, '
                 'rega quando solo < ${planta.regaInicio}% / para > ${planta.regaFim}%, '
                 'irrigação ${planta.fatorNome}, '
@@ -190,6 +206,14 @@ class RelatoriosScreen extends StatelessWidget {
                   bottom: pw.BorderSide(color: PdfColors.blueGrey100)),
               cellStyle: const pw.TextStyle(fontSize: 8),
             ),
+            pw.SizedBox(height: 16),
+            pw.Text('Gráficos',
+                style: pw.TextStyle(
+                    fontSize: 16,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.green800)),
+            pw.SizedBox(height: 8),
+            ..._secaoGraficosPdf(ordenadas),
           ],
         ),
       );
@@ -389,16 +413,16 @@ class RelatoriosScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    leituras.isEmpty
-                        ? 'Sem dados ainda. Conecte o ESP32 para coletar telemetria.'
-                        : '${leituras.length} leituras armazenadas cobrindo '
-                            '${_fmtCobertura(leituras.first.tempo, leituras.last.tempo)}. '
-                            'Leituras repetidas são unidas no relatório: cada '
-                            'registro mostra quanto tempo o valor durou até a '
-                            'próxima mudança.',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
+                    Text(
+                      leituras.isEmpty
+                          ? 'Sem dados ainda. Conecte o ESP32 para coletar telemetria.'
+                          : '${leituras.length} leituras armazenadas cobrindo '
+                              '${_fmtCobertura(leituras.first.tempo, leituras.last.tempo)}. '
+                              'Leituras repetidas são unidas no relatório: a '
+                              'coluna Durou mostra quanto tempo a leitura ficou '
+                              'repetindo (0s se mudou na hora).',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
                     onPressed: leituras.isEmpty ? null : () => _gerarPdf(context),
@@ -412,6 +436,88 @@ class RelatoriosScreen extends StatelessWidget {
               ),
             ),
           ),
+          if (leituras.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _GraficoGrandeCard(
+              titulo: 'Umidade do solo (%)',
+              icone: Icons.water_drop_outlined,
+              cor: Colors.blue,
+              leituras: leituras,
+              extrair: (l) => l.umidadeSolo.toDouble(),
+              filtroMin: 0,
+              filtroMax: 100,
+              eixoMin: 0,
+              eixoMax: 100,
+              unidade: '%',
+              referencias: [
+                _Ref('Ideal', planta.umidadeIdeal.toDouble(), Colors.green),
+                _Ref('Liga', planta.regaInicio.toDouble(), Colors.orange),
+                _Ref('Desliga', planta.regaFim.toDouble(), Colors.redAccent),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _GraficoGrandeCard(
+              titulo: 'Umidade do ar (%)',
+              icone: Icons.cloud_outlined,
+              cor: Colors.teal,
+              leituras: leituras,
+              extrair: (l) => l.umidadeAr.toDouble(),
+              filtroMin: 0,
+              filtroMax: 100,
+              eixoMin: 0,
+              eixoMax: 100,
+              unidade: '%',
+            ),
+            const SizedBox(height: 12),
+            _GraficoGrandeCard(
+              titulo: 'Temperatura (°C)',
+              icone: Icons.thermostat,
+              cor: Colors.orange,
+              leituras: leituras,
+              extrair: (l) => l.temperatura,
+              filtroMin: -40,
+              filtroMax: 80,
+              casas: 1,
+              unidade: '°C',
+            ),
+            if (leituras.any((l) => l.vazao > 0)) ...[
+              const SizedBox(height: 12),
+              _GraficoGrandeCard(
+                titulo: 'Vazão (L/min)',
+                icone: Icons.water_outlined,
+                cor: Colors.cyan,
+                leituras: leituras,
+                extrair: (l) => l.vazao,
+                filtroMin: 0,
+                casas: 2,
+                unidade: ' L/min',
+              ),
+            ],
+            if (leituras.any((l) => l.litros > 0)) ...[
+              const SizedBox(height: 12),
+              _GraficoGrandeCard(
+                titulo: 'Consumo acumulado (L)',
+                icone: Icons.local_drink_outlined,
+                cor: Colors.indigo,
+                leituras: leituras,
+                extrair: (l) => l.litros,
+                filtroMin: 0,
+                casas: 2,
+                unidade: ' L',
+              ),
+            ],
+            const SizedBox(height: 12),
+            _GraficoGrandeCard(
+              titulo: 'Irrigações hoje (acumulado do dia)',
+              icone: Icons.repeat,
+              cor: Colors.purple,
+              leituras: leituras,
+              extrair: (l) => l.irrigacoesHoje.toDouble(),
+              filtroMin: 0,
+              suave: false,
+              casas: 0,
+            ),
+          ],
           const SizedBox(height: 12),
           Card(
             elevation: 0,
@@ -509,6 +615,231 @@ class RelatoriosScreen extends StatelessWidget {
     return 'O ESP32 registrou $n problema${n > 1 ? 's' : ''}. Toque para ver e '
         'consultar o log gravado no firmware. ⚠️';
   }
+
+  // ---------------- Gráficos do PDF (v1.0.0+19) ----------------
+
+  /// Converte as leituras em pontos (x = epoch em segundos, y = valor),
+  /// com média por fatia quando há dados demais (máx. [max] pontos).
+  List<pw.PointChartValue> _pontosPdf(
+      List<Leitura> vs, double Function(Leitura) f, int max) {
+    if (vs.length <= max) {
+      return [
+        for (final l in vs)
+          pw.PointChartValue(
+              l.tempo.millisecondsSinceEpoch / 1000.0, f(l)),
+      ];
+    }
+    final passo = vs.length / max;
+    final res = <pw.PointChartValue>[];
+    for (var i = 0; i < max; i++) {
+      final ini = (i * passo).floor();
+      final fim = ((i + 1) * passo).floor().clamp(ini + 1, vs.length);
+      var soma = 0.0;
+      for (var j = ini; j < fim; j++) {
+        soma += f(vs[j]);
+      }
+      final meio = vs[(ini + fim) >> 1];
+      res.add(pw.PointChartValue(
+          meio.tempo.millisecondsSinceEpoch / 1000.0, soma / (fim - ini)));
+    }
+    return res;
+  }
+
+  /// Gera os valores do eixo Y com passos "bonitos" cobrindo [lo]..[hi].
+  List<double> _ticksY(double lo, double hi) {
+    if (hi - lo < 1e-9) {
+      lo -= 1;
+      hi += 1;
+    }
+    final passo = _passoBonitoEixo((hi - lo) / 3);
+    final inicio = (lo / passo).floor() * passo;
+    final res = <double>[];
+    for (var v = inicio; v <= hi + passo * 0.001; v += passo) {
+      res.add(v);
+    }
+    return res;
+  }
+
+  /// Um bloco de gráfico do PDF: título + Chart com eixos rotulados.
+  pw.Widget _blocoGraficoPdf({
+    required String titulo,
+    required List<pw.PointChartValue> pontos,
+    required double x0,
+    required double x1,
+    required bool horas,
+    PdfColor cor = PdfColors.blue700,
+    bool curva = true,
+    pw.LineDataSet? extra,
+  }) {
+    final ys = pontos.map((p) => p.y).toList();
+    final yTicks = _ticksY(ys.reduce(min), ys.reduce(max));
+    final xTicks = List<double>.generate(
+        5, (i) => x0 + (x1 - x0) * i / 4);
+
+    String fmtX(num v) {
+      final t = DateTime.fromMillisecondsSinceEpoch((v * 1000).round());
+      if (horas) {
+        return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+      }
+      return '${t.day.toString().padLeft(2, '0')}/${t.month.toString().padLeft(2, '0')}';
+    }
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(titulo,
+            style: pw.TextStyle(
+                fontSize: 11, fontWeight: pw.FontWeight.bold)),
+        pw.SizedBox(height: 4),
+        pw.Container(
+          height: 150,
+          child: pw.Chart(
+            left: pw.ChartLegend(
+              direction: pw.Axis.vertical,
+              textStyle: const pw.TextStyle(fontSize: 7),
+              position: pw.Alignment.topCenter,
+              padding: const pw.EdgeInsets.only(right: 4),
+            ),
+            bottom: pw.ChartLegend(
+              direction: pw.Axis.horizontal,
+              textStyle: const pw.TextStyle(fontSize: 7),
+              padding: const pw.EdgeInsets.only(top: 2),
+            ),
+            grid: pw.CartesianGrid(
+              xAxis: pw.FixedAxis<double>(xTicks,
+                  format: fmtX, divisions: true, ticks: true),
+              yAxis: pw.FixedAxis<double>(yTicks,
+                  format: (v) => v.toStringAsFixed(v % 1 == 0 ? 0 : 1),
+                  divisions: true,
+                  ticks: true,
+                  marginStart: 10,
+                  marginEnd: 10),
+            ),
+            datasets: [
+              if (extra != null) extra,
+              pw.LineDataSet(
+                data: pontos,
+                legend: titulo,
+                color: cor,
+                lineColor: cor,
+                lineWidth: 1.4,
+                drawPoints: false,
+                drawSurface: true,
+                surfaceColor: cor,
+                surfaceOpacity: 0.15,
+                isCurved: curva,
+              ),
+            ],
+          ),
+        ),
+        pw.SizedBox(height: 14),
+      ],
+    );
+  }
+
+  /// Seção "Gráficos" do PDF: um gráfico para cada leitura (solo, ar,
+  /// temperatura, vazão, consumo e irrigações), depois da tabela de dados.
+  List<pw.Widget> _secaoGraficosPdf(List<Leitura> ordenadas) {
+    final blocos = <pw.Widget>[];
+
+    List<Leitura> filtrar(double Function(Leitura) f,
+        {double? fMin, double? fMax}) {
+      return ordenadas.where((l) {
+        final v = f(l);
+        return !v.isNaN &&
+            !v.isInfinite &&
+            (fMin == null || v >= fMin) &&
+            (fMax == null || v <= fMax);
+      }).toList();
+    }
+
+    void adicionar({
+      required String titulo,
+      required List<Leitura> serie,
+      required double Function(Leitura) f,
+      PdfColor cor = PdfColors.blue700,
+      bool curva = true,
+      pw.LineDataSet? extra,
+    }) {
+      if (serie.length < 2) return;
+      final x0 =
+          serie.first.tempo.millisecondsSinceEpoch / 1000.0;
+      final x1 = serie.last.tempo.millisecondsSinceEpoch / 1000.0;
+      final spanHoras = (x1 - x0) / 3600.0;
+      blocos.add(_blocoGraficoPdf(
+        titulo: titulo,
+        pontos: _pontosPdf(serie, f, 120),
+        x0: x0,
+        x1: x1,
+        horas: spanHoras < 24,
+        cor: cor,
+        curva: curva,
+        extra: extra,
+      ));
+    }
+
+    // Solo: inclui a linha da umidade ideal (verde).
+    final solo = filtrar((l) => l.umidadeSolo.toDouble(),
+        fMin: 0, fMax: 100);
+    if (solo.length >= 2) {
+      final x0 = solo.first.tempo.millisecondsSinceEpoch / 1000.0;
+      final x1 = solo.last.tempo.millisecondsSinceEpoch / 1000.0;
+      final ideal = planta.umidadeIdeal.toDouble();
+      adicionar(
+        titulo:
+            'Umidade do solo (%) — linha verde = ideal ${planta.umidadeIdeal}%',
+        serie: solo,
+        f: (l) => l.umidadeSolo.toDouble(),
+        cor: PdfColors.blue700,
+        extra: pw.LineDataSet(
+          data: [
+            pw.PointChartValue(x0, ideal),
+            pw.PointChartValue(x1, ideal),
+          ],
+          legend: 'Ideal',
+          color: PdfColors.green600,
+          lineColor: PdfColors.green600,
+          lineWidth: 0.9,
+          drawPoints: false,
+        ),
+      );
+    }
+
+    adicionar(
+      titulo: 'Umidade do ar (%)',
+      serie: filtrar((l) => l.umidadeAr.toDouble(), fMin: 0, fMax: 100),
+      f: (l) => l.umidadeAr.toDouble(),
+      cor: PdfColors.teal,
+    );
+    adicionar(
+      titulo: 'Temperatura (°C)',
+      serie: filtrar((l) => l.temperatura, fMin: -40, fMax: 80),
+      f: (l) => l.temperatura,
+      cor: PdfColors.orange700,
+    );
+    adicionar(
+      titulo: 'Vazão (L/min)',
+      serie: filtrar((l) => l.vazao, fMin: 0),
+      f: (l) => l.vazao,
+      cor: PdfColors.cyan700,
+      curva: false,
+    );
+    adicionar(
+      titulo: 'Consumo acumulado (L)',
+      serie: filtrar((l) => l.litros, fMin: 0),
+      f: (l) => l.litros,
+      cor: PdfColors.indigo,
+    );
+    adicionar(
+      titulo: 'Irrigações hoje (acumulado do dia)',
+      serie: filtrar((l) => l.irrigacoesHoje.toDouble(), fMin: 0),
+      f: (l) => l.irrigacoesHoje.toDouble(),
+      cor: PdfColors.purple,
+      curva: false,
+    );
+
+    return blocos;
+  }
 }
 
 String _fmtCobertura(DateTime inicio, DateTime fim) {
@@ -516,4 +847,385 @@ String _fmtCobertura(DateTime inicio, DateTime fim) {
   if (d.inHours >= 24) return '${d.inDays} dias e ${d.inHours % 24} h';
   if (d.inHours > 0) return '${d.inHours} h ${d.inMinutes % 60} min';
   return '${d.inMinutes} min';
+}
+
+/// Escolhe um passo "bonito" para eixos (1, 2, 2.5, 5, 10...).
+double _passoBonitoEixo(double faixa) {
+  if (faixa <= 0) return 1;
+  final bruto = faixa / 4;
+  final mag = pow(10, (log(bruto) / ln10).floor()).toDouble();
+  for (final m in const [1.0, 2.0, 2.5, 5.0, 10.0]) {
+    if (bruto <= m * mag) return m * mag;
+  }
+  return 10 * mag;
+}
+
+/// Linha de referência desenhada sobre o gráfico (ex.: umidade ideal).
+class _Ref {
+  const _Ref(this.rotulo, this.valor, this.cor);
+  final String rotulo;
+  final double valor;
+  final Color cor;
+}
+
+/// Gráfico GRANDE e detalhado para o relatório: eixos com valores e horários,
+/// grade, tooltip ao tocar, linha de referência, preenchimento com gradiente
+/// e estatísticas (mín/média/máx/atual). Mostra o histórico inteiro — quando
+/// há leituras demais, faz a média de cada fatia de tempo (até 400 pontos).
+class _GraficoGrandeCard extends StatelessWidget {
+  const _GraficoGrandeCard({
+    required this.titulo,
+    required this.icone,
+    required this.cor,
+    required this.leituras,
+    required this.extrair,
+    this.filtroMin,
+    this.filtroMax,
+    this.eixoMin,
+    this.eixoMax,
+    this.casas = 0,
+    this.unidade = '',
+    this.suave = true,
+    this.referencias = const [],
+  });
+
+  final String titulo;
+  final IconData icone;
+  final Color cor;
+  final List<Leitura> leituras;
+  final double Function(Leitura) extrair;
+
+  /// Faixa física válida do sensor (fora dela = falha de leitura, ignora).
+  final double? filtroMin;
+  final double? filtroMax;
+
+  /// Limites fixos do eixo Y (ex.: 0..100 para umidade). Nulo = automático.
+  final double? eixoMin;
+  final double? eixoMax;
+
+  final int casas;
+  final String unidade;
+
+  /// true = linha curvada; false = degraus (contadores, ex.: irrigações).
+  final bool suave;
+
+  final List<_Ref> referencias;
+
+  static const int _maxPontos = 400;
+
+  String _fmt(double v) => v.toStringAsFixed(casas);
+
+  @override
+  Widget build(BuildContext context) {
+    final ordenadas = List<Leitura>.from(leituras)
+      ..sort((a, b) => a.tempo.compareTo(b.tempo));
+    final validas = ordenadas.where((l) {
+      final v = extrair(l);
+      return !v.isNaN &&
+          !v.isInfinite &&
+          (filtroMin == null || v >= filtroMin!) &&
+          (filtroMax == null || v <= filtroMax!);
+    }).toList();
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icone, size: 20, color: cor),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(titulo,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleSmall
+                          ?.copyWith(fontWeight: FontWeight.bold)),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: cor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text('${validas.length} leituras',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: cor)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 260,
+              child: validas.length < 2
+                  ? Center(
+                      child: Text('Sem leituras válidas suficientes',
+                          style: Theme.of(context).textTheme.bodySmall),
+                    )
+                  : _linha(context, validas),
+            ),
+            if (referencias.isNotEmpty && validas.length >= 2) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 14,
+                runSpacing: 4,
+                children: [
+                  for (final r in referencias)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(width: 14, height: 3, color: r.cor),
+                        const SizedBox(width: 5),
+                        Text('${r.rotulo}: ${_fmt(r.valor)}$unidade',
+                            style: Theme.of(context).textTheme.bodySmall),
+                      ],
+                    ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 10),
+            if (validas.isNotEmpty) _estatisticas(context, validas),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _estatisticas(BuildContext context, List<Leitura> vs) {
+    final vals = vs.map(extrair).toList();
+    final minV = vals.reduce((a, b) => a < b ? a : b);
+    final maxV = vals.reduce((a, b) => a > b ? a : b);
+    final med =
+        vals.fold<double>(0, (a, b) => a + b) / vals.length;
+    final atual = vals.last;
+
+    Widget item(String rotulo, String valor) => Expanded(
+          child: Column(
+            children: [
+              Text(rotulo,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: Theme.of(context).hintColor)),
+              const SizedBox(height: 2),
+              Text(valor,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.bold)),
+            ],
+          ),
+        );
+
+    return Row(
+      children: [
+        item('Mínimo', '${_fmt(minV)}$unidade'),
+        item('Média', '${_fmt(med)}$unidade'),
+        item('Máximo', '${_fmt(maxV)}$unidade'),
+        item('Atual', '${_fmt(atual)}$unidade'),
+      ],
+    );
+  }
+
+  /// Converte as leituras em pontos. Com dados demais, divide a linha do
+  /// tempo em até [_maxPontos] fatias e usa a média de cada uma.
+  List<FlSpot> _spots(List<Leitura> vs) {
+    if (vs.length <= _maxPontos) {
+      return [
+        for (var i = 0; i < vs.length; i++)
+          FlSpot(vs[i].tempo.millisecondsSinceEpoch.toDouble(), extrair(vs[i])),
+      ];
+    }
+    final passo = vs.length / _maxPontos;
+    final res = <FlSpot>[];
+    for (var i = 0; i < _maxPontos; i++) {
+      final ini = (i * passo).floor();
+      final fim = ((i + 1) * passo).floor().clamp(ini + 1, vs.length);
+      var soma = 0.0;
+      for (var j = ini; j < fim; j++) {
+        soma += extrair(vs[j]);
+      }
+      final meio = vs[(ini + fim) >> 1];
+      res.add(FlSpot(meio.tempo.millisecondsSinceEpoch.toDouble(),
+          soma / (fim - ini)));
+    }
+    return res;
+  }
+
+  // Escolhe um passo "bonito" para a grade do eixo Y (1, 2, 2.5, 5, 10...).
+  double _passoBonito(double faixa) => _passoBonitoEixo(faixa);
+
+  String _rotuloX(DateTime t, Duration span) {
+    if (span.inHours < 24) {
+      return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+    }
+    return '${t.day.toString().padLeft(2, '0')}/${t.month.toString().padLeft(2, '0')}';
+  }
+
+  String _rotuloXCompleto(DateTime t) =>
+      '${t.day.toString().padLeft(2, '0')}/${t.month.toString().padLeft(2, '0')} '
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  Widget _linha(BuildContext context, List<Leitura> vs) {
+    final spots = _spots(vs);
+    final t0 = vs.first.tempo;
+    final t1 = vs.last.tempo;
+    final span = t1.difference(t0);
+    final minX = t0.millisecondsSinceEpoch.toDouble();
+    final maxX = t1.millisecondsSinceEpoch.toDouble();
+
+    // Eixo Y: fixo quando definido; senão, automático com folga de 15%.
+    double minY;
+    double maxY;
+    if (eixoMin != null && eixoMax != null) {
+      minY = eixoMin!;
+      maxY = eixoMax!;
+    } else {
+      final vals = spots.map((s) => s.y).toList();
+      var lo = vals.reduce((a, b) => a < b ? a : b);
+      var hi = vals.reduce((a, b) => a > b ? a : b);
+      final margem =
+          hi - lo == 0 ? (hi.abs() + 1) * 0.2 : (hi - lo) * 0.15;
+      lo -= margem;
+      hi += margem;
+      if (eixoMin != null) lo = eixoMin!;
+      minY = lo;
+      maxY = hi;
+    }
+
+    // Só desenha linhas de referência que caibam no eixo.
+    final refsVisiveis = referencias
+        .where((r) => r.valor >= minY && r.valor <= maxY)
+        .toList();
+
+    final yStep = _passoBonito(maxY - minY);
+    final xInterval = (maxX - minX) / 4;
+    final corGrade =
+        Theme.of(context).brightness == Brightness.dark
+            ? Colors.white24
+            : Colors.black12;
+    final corEixo =
+        Theme.of(context).brightness == Brightness.dark
+            ? Colors.white38
+            : Colors.black26;
+
+    return LineChart(
+      LineChartData(
+        minX: minX,
+        maxX: maxX,
+        minY: minY,
+        maxY: maxY,
+        clipData: const FlClipData.all(),
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: true,
+          horizontalInterval: yStep,
+          verticalInterval: xInterval,
+          getDrawingHorizontalLine: (v) =>
+              FlLine(color: corGrade, strokeWidth: 1),
+          getDrawingVerticalLine: (v) =>
+              FlLine(color: corGrade.withValues(alpha: 0.5), strokeWidth: 1),
+        ),
+        titlesData: FlTitlesData(
+          topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false)),
+          rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false)),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 46,
+              interval: yStep,
+              getTitlesWidget: (v, meta) => Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Text(_fmt(v),
+                    style: TextStyle(fontSize: 10, color: corEixo)),
+              ),
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 26,
+              interval: xInterval,
+              getTitlesWidget: (v, meta) => Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                    _rotuloX(
+                        DateTime.fromMillisecondsSinceEpoch(v.toInt()),
+                        span),
+                    style: TextStyle(fontSize: 10, color: corEixo)),
+              ),
+            ),
+          ),
+        ),
+        borderData: FlBorderData(
+          show: true,
+          border: Border(
+            left: BorderSide(color: corEixo),
+            bottom: BorderSide(color: corEixo),
+          ),
+        ),
+        lineTouchData: LineTouchData(
+          touchTooltipData: LineTouchTooltipData(
+            getTooltipColor: (_) => Colors.blueGrey.shade900,
+            tooltipRoundedRadius: 8,
+            getTooltipItems: (tocados) => [
+              for (final s in tocados)
+                LineTooltipItem(
+                  '${_fmt(s.y)}$unidade\n'
+                  '${_rotuloXCompleto(DateTime.fromMillisecondsSinceEpoch(s.x.toInt()))}',
+                  const TextStyle(
+                      color: Colors.white, fontSize: 11, height: 1.35),
+                ),
+            ],
+          ),
+        ),
+        lineBarsData: [
+          for (final r in refsVisiveis)
+            LineChartBarData(
+              spots: [
+                FlSpot(minX, r.valor),
+                FlSpot(maxX, r.valor),
+              ],
+              color: r.cor.withValues(alpha: 0.8),
+              barWidth: 1.3,
+              isCurved: false,
+              dashArray: const [5, 4],
+              dotData: const FlDotData(show: false),
+            ),
+          LineChartBarData(
+            spots: spots,
+            color: cor,
+            isCurved: suave,
+            curveSmoothness: 0.25,
+            preventCurveOverShooting: true,
+            barWidth: 2.5,
+            isStrokeCapRound: true,
+            dotData: const FlDotData(show: false),
+            belowBarData: BarAreaData(
+              show: true,
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  cor.withValues(alpha: 0.25),
+                  cor.withValues(alpha: 0.02),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+      duration: const Duration(milliseconds: 300),
+    );
+  }
 }

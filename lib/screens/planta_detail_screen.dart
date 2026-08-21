@@ -9,7 +9,6 @@ import 'configuracao_planta_screen.dart';
 import 'estatisticas_screen.dart';
 import 'relatorios_screen.dart';
 import 'sensibilidade_screen.dart';
-import '../widgets/botao_parar_rega.dart';
 
 class PlantaDetailScreen extends StatefulWidget {
   const PlantaDetailScreen({super.key, required this.planta});
@@ -54,7 +53,6 @@ class _PlantaDetailScreenState extends State<PlantaDetailScreen> {
             conectado ? disp.leituras : (_offline ?? <Leitura>[]);
         return Scaffold(
           appBar: AppBar(title: Text(planta.nome)),
-          floatingActionButton: const BotaoPararRega(),
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [
